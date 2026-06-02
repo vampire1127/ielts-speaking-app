@@ -24,7 +24,15 @@
   --font-sans: "DM Sans", "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
   --transition: 0.2s ease;
   --header-h: 64px;
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --touch-min: 44px;
+  --app-padding-x: clamp(14px, 4vw, 24px);
+  --title-size: clamp(0.8125rem, 2.8vw + 0.35rem, 1.125rem);
+  --question-size: clamp(1rem, 1.5vw + 0.75rem, 1.25rem);
+  --timer-size: clamp(2.5rem, 10vw, 3.5rem);
 }
 
 /* ===== Reset & Base ===== */
@@ -46,6 +54,9 @@ body {
   line-height: 1.6;
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
 button, input, select { font: inherit; color: inherit; }
@@ -54,9 +65,14 @@ ul { list-style: none; }
 
 /* ===== Layout ===== */
 .app {
+  width: 100%;
   max-width: 680px;
   margin: 0 auto;
-  padding: 0 16px calc(24px + var(--safe-bottom));
+  padding:
+    var(--safe-top)
+    max(var(--app-padding-x), var(--safe-right))
+    calc(20px + var(--safe-bottom))
+    max(var(--app-padding-x), var(--safe-left));
 }
 
 /* ===== Header ===== */
@@ -64,31 +80,37 @@ ul { list-style: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: 12px 0 16px;
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(240, 242, 248, 0.85);
+  background: rgba(240, 242, 248, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  gap: 8px;
 }
 
 .header__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
 }
 
 .header__logo {
-  font-size: 28px;
+  font-size: clamp(1.375rem, 4vw, 1.75rem);
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .header__title {
-  font-size: 1.125rem;
+  font-size: var(--title-size);
   font-weight: 700;
   color: var(--color-primary);
-  line-height: 1.3;
+  line-height: 1.35;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .header__subtitle {
@@ -101,16 +123,22 @@ ul { list-style: none; }
 .header__actions {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
+}
+
+.header__actions .btn--icon {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
 }
 
 /* ===== Part Tabs ===== */
 .part-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: clamp(4px, 1.5vw, 8px);
+  margin-bottom: clamp(14px, 3vw, 20px);
   background: var(--color-surface);
-  padding: 6px;
+  padding: clamp(4px, 1.2vw, 6px);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
@@ -119,7 +147,9 @@ ul { list-style: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 8px;
+  justify-content: center;
+  padding: clamp(8px, 2.5vw, 12px) clamp(4px, 1.5vw, 8px);
+  min-height: var(--touch-min);
   border-radius: var(--radius-md);
   transition: all var(--transition);
   color: var(--color-text-muted);
@@ -162,7 +192,7 @@ ul { list-style: none; }
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: clamp(14px, 4vw, 20px);
   box-shadow: var(--shadow-md);
   border: 1px solid rgba(226, 232, 240, 0.6);
 }
@@ -171,8 +201,9 @@ ul { list-style: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: clamp(12px, 3vw, 16px);
+  gap: 10px;
 }
 
 .card__title {
@@ -205,7 +236,7 @@ ul { list-style: none; }
 }
 
 .question-text {
-  font-size: 1.125rem;
+  font-size: var(--question-size);
   font-weight: 600;
   line-height: 1.5;
   color: var(--color-primary);
@@ -266,11 +297,15 @@ ul { list-style: none; }
   justify-content: center;
   gap: 6px;
   padding: 10px 18px;
+  min-height: var(--touch-min);
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 600;
   transition: all var(--transition);
   white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .btn:disabled {
@@ -329,11 +364,12 @@ ul { list-style: none; }
 }
 
 .btn--record {
+  flex: 1 1 100%;
   background: var(--color-record);
   color: #fff;
-  padding: 12px 24px;
+  padding: clamp(12px, 3vw, 14px) clamp(18px, 5vw, 24px);
   border-radius: var(--radius-full);
-  font-size: 0.9375rem;
+  font-size: clamp(0.875rem, 2.5vw, 0.9375rem);
 }
 
 .btn--record:hover:not(:disabled) {
@@ -378,13 +414,25 @@ ul { list-style: none; }
 }
 
 .timer-display {
-  font-size: 3rem;
+  font-size: var(--timer-size);
   font-weight: 700;
   text-align: center;
   color: var(--color-primary);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
   margin: 8px 0;
+}
+
+.timer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 2vw, 10px);
+  justify-content: center;
+}
+
+.timer-controls .btn {
+  flex: 1 1 calc(33.333% - 8px);
+  min-width: min(100%, 96px);
 }
 
 .timer-progress {
@@ -401,12 +449,6 @@ ul { list-style: none; }
   border-radius: var(--radius-full);
   width: 0%;
   transition: width 0.3s linear;
-}
-
-.timer-controls {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
 }
 
 .timer-hint {
@@ -488,14 +530,20 @@ ul { list-style: none; }
 
 .recording-controls {
   display: flex;
-  gap: 8px;
-  justify-content: center;
   flex-wrap: wrap;
+  gap: clamp(6px, 2vw, 10px);
+  justify-content: center;
+}
+
+.recording-controls .btn {
+  flex: 1 1 calc(50% - 6px);
+  min-width: min(100%, 120px);
 }
 
 #audioPlayback {
   width: 100%;
   margin-top: 12px;
+  min-height: var(--touch-min);
 }
 
 .transcript-box {
@@ -804,7 +852,7 @@ ul { list-style: none; }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface-2);
-  font-size: 0.875rem;
+  font-size: 16px;
   transition: border-color var(--transition);
 }
 
@@ -847,15 +895,24 @@ ul { list-style: none; }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* ===== Responsive ===== */
+/* ===== Responsive — 全机型手机适配 ===== */
+
+/* 大屏手机 / 小平板 / 桌面（≥640px） */
 @media (min-width: 640px) {
-  .app { padding: 0 24px 32px; }
+  .app {
+    padding:
+      var(--safe-top)
+      max(24px, var(--safe-right))
+      calc(32px + var(--safe-bottom))
+      max(24px, var(--safe-left));
+  }
 
   .header { padding: 20px 0; }
 
-  .question-text { font-size: 1.25rem; }
-
-  .timer-display { font-size: 3.5rem; }
+  .timer-controls .btn,
+  .recording-controls .btn {
+    flex: 0 1 auto;
+  }
 
   .modal {
     align-items: center;
@@ -868,14 +925,99 @@ ul { list-style: none; }
   }
 }
 
-@media (max-width: 380px) {
-  .recording-controls .btn {
-    padding: 10px 14px;
-    font-size: 0.8125rem;
+/* 所有手机竖屏（320px ~ 639px）
+   覆盖：iPhone SE、13/14/15、Pro、Pro Max/Plus、主流 Android */
+@media (max-width: 639px) {
+  html {
+    font-size: clamp(14px, 3.8vw, 16px);
+  }
+
+  .main {
+    gap: clamp(12px, 3vw, 16px);
+  }
+
+  .question-card .card__header {
+    align-items: flex-start;
+  }
+
+  .part-tab__label {
+    font-size: clamp(0.8125rem, 2.5vw, 0.9375rem);
+  }
+
+  .part-tab__desc {
+    font-size: clamp(0.625rem, 2vw, 0.6875rem);
+  }
+
+  .btn--sm {
+    min-height: var(--touch-min);
+  }
+
+  .sample-toggle {
+    min-height: var(--touch-min);
+  }
+
+  .modal__panel {
+    max-height: min(90dvh, calc(100dvh - var(--safe-top) - 16px));
+  }
+
+  .footer {
+    padding: 16px 0 4px;
+    font-size: clamp(0.5625rem, 2.5vw, 0.6875rem);
+    line-height: 1.5;
+  }
+
+  .score-grid {
+    gap: clamp(12px, 3vw, 16px);
+  }
+}
+
+/* 小屏手机（≤360px）：iPhone SE、小尺寸 Android */
+@media (max-width: 360px) {
+  :root {
+    --app-padding-x: 12px;
+  }
+
+  .header__brand {
+    gap: 8px;
   }
 
   .timer-controls .btn {
-    padding: 8px 14px;
-    font-size: 0.8125rem;
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .overall-score__value {
+    font-size: 1.5rem;
+  }
+}
+
+/* 大屏手机（400px~639px）：Pro Max / Plus / 大屏 Android */
+@media (min-width: 400px) and (max-width: 639px) {
+  .card {
+    padding: clamp(16px, 4.5vw, 20px);
+  }
+
+  .timer-controls .btn {
+    flex: 1 1 calc(33.333% - 8px);
+  }
+}
+
+/* 横屏手机：压缩垂直空间 */
+@media (max-height: 500px) and (orientation: landscape) {
+  .header {
+    padding: 8px 0 10px;
+  }
+
+  .timer-display {
+    font-size: clamp(2rem, 8vh, 2.5rem);
+    margin: 4px 0;
+  }
+
+  .waveform {
+    height: 32px;
+    margin: 8px 0;
+  }
+
+  .modal__panel {
+    max-height: 95dvh;
   }
 }
