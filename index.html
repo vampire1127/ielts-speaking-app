@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="雅思口语练习 — Part 1/2/3 随机抽题、录音、AI 智能评分" />
+  <meta name="theme-color" content="#1a2744" />
+  <title>雅思口语练习 | IELTS Speaking Practice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header__brand">
+        <span class="header__logo" aria-hidden="true">🎙</span>
+        <div>
+          <h1 class="header__title">雅思口语练习</h1>
+          <p class="header__subtitle">IELTS Speaking Practice</p>
+        </div>
+      </div>
+      <div class="header__actions">
+        <button class="btn btn--ghost btn--icon" id="historyBtn" aria-label="历史记录" title="历史记录">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+        <button class="btn btn--ghost btn--icon" id="settingsBtn" aria-label="设置" title="设置">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Part Tabs -->
+    <nav class="part-tabs" role="tablist" aria-label="选择口语部分">
+      <button class="part-tab part-tab--active" role="tab" aria-selected="true" data-part="part1" id="tab-part1">
+        <span class="part-tab__label">Part 1</span>
+        <span class="part-tab__desc">问答</span>
+      </button>
+      <button class="part-tab" role="tab" aria-selected="false" data-part="part2" id="tab-part2">
+        <span class="part-tab__label">Part 2</span>
+        <span class="part-tab__desc">独白</span>
+      </button>
+      <button class="part-tab" role="tab" aria-selected="false" data-part="part3" id="tab-part3">
+        <span class="part-tab__label">Part 3</span>
+        <span class="part-tab__desc">讨论</span>
+      </button>
+    </nav>
+
+    <main class="main">
+      <!-- Question Card -->
+      <section class="card question-card" aria-labelledby="question-heading">
+        <div class="card__header">
+          <div class="question-meta">
+            <span class="badge" id="topicBadge">Topic</span>
+            <span class="question-id" id="questionId"></span>
+          </div>
+          <button class="btn btn--secondary btn--sm" id="newQuestionBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            换一题
+          </button>
+        </div>
+
+        <h2 class="question-text" id="questionText">Loading...</h2>
+
+        <!-- Part 2 cues -->
+        <div class="cues" id="cuesContainer" hidden>
+          <p class="cues__title">You should say:</p>
+          <ul class="cues__list" id="cuesList"></ul>
+        </div>
+
+        <!-- Part 1 follow-up -->
+        <p class="follow-up" id="followUpText" hidden></p>
+      </section>
+
+      <!-- Timer -->
+      <section class="card timer-card">
+        <div class="timer-card__header">
+          <h3 class="card__title">计时器</h3>
+          <div class="timer-mode" id="timerModeLabel">自由练习</div>
+        </div>
+        <div class="timer-display" id="timerDisplay" aria-live="polite">00:00</div>
+        <div class="timer-progress">
+          <div class="timer-progress__bar" id="timerProgressBar"></div>
+        </div>
+        <div class="timer-controls">
+          <button class="btn btn--primary" id="timerStartBtn">开始</button>
+          <button class="btn btn--secondary" id="timerPauseBtn" disabled>暂停</button>
+          <button class="btn btn--ghost" id="timerResetBtn">重置</button>
+        </div>
+        <p class="timer-hint" id="timerHint">Part 1 建议回答 20–30 秒；Part 3 建议 45–60 秒</p>
+      </section>
+
+      <!-- Recording -->
+      <section class="card recording-card">
+        <div class="card__header">
+          <h3 class="card__title">录音练习</h3>
+          <span class="recording-status" id="recordingStatus">就绪</span>
+        </div>
+
+        <div class="waveform" id="waveform" aria-hidden="true">
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+          <div class="waveform__bar"></div>
+        </div>
+
+        <div class="recording-time" id="recordingTime">00:00</div>
+
+        <div class="recording-controls">
+          <button class="btn btn--record" id="recordBtn" aria-label="开始录音">
+            <span class="record-dot"></span>
+            开始录音
+          </button>
+          <button class="btn btn--secondary" id="stopBtn" disabled>停止</button>
+          <button class="btn btn--ghost" id="playbackBtn" disabled>回放</button>
+        </div>
+
+        <audio id="audioPlayback" controls hidden></audio>
+
+        <div class="transcript-box" id="transcriptBox" hidden>
+          <p class="transcript-box__label">识别文本</p>
+          <p class="transcript-box__text" id="transcriptText"></p>
+        </div>
+      </section>
+
+      <!-- Scoring -->
+      <section class="card scoring-card" id="scoringCard" hidden>
+        <div class="card__header">
+          <h3 class="card__title">AI 评分</h3>
+          <div class="overall-score">
+            <span class="overall-score__value" id="overallScore">—</span>
+            <span class="overall-score__label">综合</span>
+          </div>
+        </div>
+
+        <div class="score-grid" id="scoreGrid">
+          <div class="score-item">
+            <div class="score-item__header">
+              <span class="score-item__name">流利度</span>
+              <span class="score-item__value" data-criterion="fluency">—</span>
+            </div>
+            <div class="score-bar"><div class="score-bar__fill" data-bar="fluency"></div></div>
+            <p class="score-item__comment" data-comment="fluency"></p>
+          </div>
+          <div class="score-item">
+            <div class="score-item__header">
+              <span class="score-item__name">词汇</span>
+              <span class="score-item__value" data-criterion="vocabulary">—</span>
+            </div>
+            <div class="score-bar"><div class="score-bar__fill" data-bar="vocabulary"></div></div>
+            <p class="score-item__comment" data-comment="vocabulary"></p>
+          </div>
+          <div class="score-item">
+            <div class="score-item__header">
+              <span class="score-item__name">语法</span>
+              <span class="score-item__value" data-criterion="grammar">—</span>
+            </div>
+            <div class="score-bar"><div class="score-bar__fill" data-bar="grammar"></div></div>
+            <p class="score-item__comment" data-comment="grammar"></p>
+          </div>
+          <div class="score-item">
+            <div class="score-item__header">
+              <span class="score-item__name">发音</span>
+              <span class="score-item__value" data-criterion="pronunciation">—</span>
+            </div>
+            <div class="score-bar"><div class="score-bar__fill" data-bar="pronunciation"></div></div>
+            <p class="score-item__comment" data-comment="pronunciation"></p>
+          </div>
+        </div>
+
+        <button class="btn btn--primary btn--full" id="analyzeBtn" disabled>
+          <span id="analyzeBtnText">开始 AI 评分</span>
+        </button>
+        <p class="scoring-note" id="scoringNote">基于语音识别与语言分析的智能评分，无需后端</p>
+      </section>
+
+      <!-- Sample Answer -->
+      <section class="card sample-card">
+        <button class="sample-toggle" id="sampleToggle" aria-expanded="false">
+          <span class="sample-toggle__icon">💡</span>
+          <span class="sample-toggle__text">查看高分范例回答</span>
+          <svg class="sample-toggle__chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="sample-content" id="sampleContent" hidden>
+          <p class="sample-content__text" id="sampleAnswerText"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>纯前端应用 · 数据保存在本地浏览器 · 可直接部署至 Vercel / GitHub Pages</p>
+    </footer>
+  </div>
+
+  <!-- History Modal -->
+  <div class="modal" id="historyModal" hidden role="dialog" aria-labelledby="historyModalTitle" aria-modal="true">
+    <div class="modal__backdrop" data-close-modal></div>
+    <div class="modal__panel">
+      <div class="modal__header">
+        <h2 id="historyModalTitle">练习历史</h2>
+        <button class="btn btn--ghost btn--icon" data-close-modal aria-label="关闭">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="history-empty" id="historyEmpty">
+          <p>暂无练习记录</p>
+          <p class="history-empty__hint">完成录音并评分后，记录会自动保存在本地</p>
+        </div>
+        <ul class="history-list" id="historyList"></ul>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost btn--danger" id="clearHistoryBtn">清空历史</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal" id="settingsModal" hidden role="dialog" aria-labelledby="settingsModalTitle" aria-modal="true">
+    <div class="modal__backdrop" data-close-modal></div>
+    <div class="modal__panel">
+      <div class="modal__header">
+        <h2 id="settingsModalTitle">设置</h2>
+        <button class="btn btn--ghost btn--icon" data-close-modal aria-label="关闭">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal__body">
+        <div class="setting-group">
+          <label class="setting-label" for="openaiKey">OpenAI API Key（可选）</label>
+          <input type="password" class="setting-input" id="openaiKey" placeholder="sk-..." autocomplete="off" />
+          <p class="setting-hint">填写后将使用 GPT 进行更精准的评分。密钥仅保存在本地浏览器，不会上传至任何服务器。</p>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label" for="targetBand">目标分数</label>
+          <select class="setting-input" id="targetBand">
+            <option value="5.5">5.5</option>
+            <option value="6.0">6.0</option>
+            <option value="6.5" selected>6.5</option>
+            <option value="7.0">7.0</option>
+            <option value="7.5">7.5</option>
+            <option value="8.0">8.0</option>
+          </select>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">
+            <input type="checkbox" id="autoAnalyze" checked />
+            录音结束后自动评分
+          </label>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" id="saveSettingsBtn">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="questions.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
