@@ -53,6 +53,7 @@ body {
   color: var(--color-text);
   line-height: 1.6;
   min-height: 100dvh;
+  min-height: -webkit-fill-available;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
@@ -80,7 +81,8 @@ ul { list-style: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0 16px;
+  padding: calc(12px + var(--safe-top)) 0 16px;
+  margin-top: calc(-1 * var(--safe-top));
   position: sticky;
   top: 0;
   z-index: 100;
@@ -907,7 +909,7 @@ ul { list-style: none; }
       max(24px, var(--safe-left));
   }
 
-  .header { padding: 20px 0; }
+  .header { padding: calc(20px + var(--safe-top)) 0 20px; }
 
   .timer-controls .btn,
   .recording-controls .btn {
@@ -1004,7 +1006,7 @@ ul { list-style: none; }
 /* 横屏手机：压缩垂直空间 */
 @media (max-height: 500px) and (orientation: landscape) {
   .header {
-    padding: 8px 0 10px;
+    padding: calc(8px + var(--safe-top)) 0 10px;
   }
 
   .timer-display {
@@ -1019,5 +1021,108 @@ ul { list-style: none; }
 
   .modal__panel {
     max-height: 95dvh;
+  }
+}
+
+/* iPhone 13 Pro 及同类 6.1" 屏（390×844 CSS 像素）
+   同尺寸：iPhone 12/13/14/15、13 Pro、14 Pro 等 */
+@media only screen and (min-width: 375px) and (max-width: 430px) {
+  :root {
+    --title-size: 0.9375rem;
+    --app-padding-x: 16px;
+    --question-size: 1.0625rem;
+    --timer-size: 2.75rem;
+  }
+
+  .header__brand {
+    gap: 8px;
+  }
+
+  .header__title {
+    letter-spacing: -0.01em;
+  }
+
+  .header__subtitle {
+    font-size: 0.6875rem;
+  }
+
+  .question-card .card__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .question-card .card__header .btn--sm {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .question-meta {
+    flex-wrap: wrap;
+  }
+
+  .timer-card .card__header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .recording-card .card__header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .scoring-card .card__header {
+    align-items: flex-start;
+  }
+
+  .recording-controls .btn--record {
+    flex: 1 1 100%;
+    order: -1;
+  }
+
+  .recording-controls .btn:not(.btn--record) {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  #audioPlayback {
+    border-radius: var(--radius-sm);
+  }
+
+  .modal__panel {
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: max(16px, var(--safe-bottom));
+  }
+
+  .toast {
+    bottom: calc(16px + var(--safe-bottom));
+    font-size: 0.8125rem;
+    padding: 10px 20px;
+  }
+}
+
+/* iOS Safari 专属优化 */
+@supports (-webkit-touch-callout: none) {
+  .part-tab,
+  .btn,
+  .sample-toggle,
+  .history-item {
+    -webkit-touch-callout: none;
+  }
+
+  .modal__body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  input.setting-input,
+  select.setting-input {
+    font-size: 16px;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  select.setting-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
   }
 }
