@@ -53,7 +53,9 @@
     recordingDuration: 0,
     recordingInterval: null,
     recognition: null,
+    recognitionUsed: false,
     transcript: "",
+    analyzeTimer: null,
     lastScores: null,
     settings: {
       openaiKey: "",
@@ -333,6 +335,7 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       state.audioChunks = [];
       state.transcript = "";
+      state.recognitionUsed = false;
 
       const mimeType = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
@@ -354,7 +357,7 @@
         els.analyzeBtn.disabled = false;
 
         if (state.settings.autoAnalyze) {
-          analyzeRecording();
+          scheduleAnalyzeAfterRecording();
         }
       };
 
@@ -423,28 +426,64 @@
     els.recordingStatus.classList.remove("active", "analyzing");
   }
 
+  function scheduleAnalyzeAfterRecording() {
+    if (state.analyzeTimer) clearTimeout(state.analyzeTimer);
+    // iOS Safari 语音识别结果常延迟返回，等待 final 结果
+    state.analyzeTimer = setTimeout(() => {
+      state.analyzeTimer = null;
+      analyzeRecording();
+    }, state.recognitionUsed ? 1500 : 300);
+  }
+
   function startSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
+    state.recognitionUsed = true;
     state.recognition = new SpeechRecognition();
     state.recognition.lang = "en-US";
     state.recognition.continuous = true;
     state.recognition.interimResults = true;
 
     state.recognition.onresult = (event) => {
-      let final = "";
-      for (let i = 0; i < event.results.length; i++) {
-        final += event.results[i][0].transcript + " ";
+      let combined = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        combined += event.results[i][0].transcript;
       }
-      state.transcript = final.trim();
+      if (event.results[event.results.length - 1]?.isFinal) {
+        state.transcript = (state.transcript + " " + combined).trim();
+      } else if (!state.transcript) {
+        state.transcript = combined.trim();
+      } else {
+        const finals = [];
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finals.push(event.results[i][0].transcript);
+          }
+        }
+        if (finals.length) {
+          state.transcript = finals.join(" ").trim();
+        }
+      }
     };
 
-    state.recognition.onerror = () => { /* silent */ };
+    state.recognition.onerror = (event) => {
+      if (event.error !== "aborted" && event.error !== "no-speech") {
+        state.recognitionUsed = false;
+      }
+    };
+
+    state.recognition.onend = () => {
+      if (state.isRecording) {
+        try { state.recognition.start(); } catch (_) { /* ignore */ }
+      }
+    };
 
     try {
       state.recognition.start();
-    } catch (_) { /* already started */ }
+    } catch (_) {
+      state.recognitionUsed = false;
+    }
   }
 
   function stopSpeechRecognition() {
@@ -463,7 +502,73 @@
 
   // ===== Scoring Engine =====
   function tokenize(text) {
+    if (!text) return [];
     return text.toLowerCase().replace(/[^a-z'\s-]/g, " ").split(/\s+/).filter(Boolean);
+  }
+
+  async function getAudioSpeechMetrics(blob, durationSec) {
+    const fallback = {
+      speechRatio: durationSec >= 10 ? 0.45 : 0.2,
+      durationSec,
+      estimated: true,
+    };
+    if (!blob || blob.size < 500) return fallback;
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return fallback;
+
+      const ctx = new AudioCtx();
+      const buffer = await ctx.decodeAudioData(await blob.arrayBuffer());
+      const data = buffer.getChannelData(0);
+      const sampleRate = buffer.sampleRate;
+      const windowSize = Math.max(1, Math.floor(sampleRate * 0.04));
+      let speechWindows = 0;
+      let totalWindows = 0;
+
+      for (let i = 0; i < data.length; i += windowSize) {
+        let sum = 0;
+        const end = Math.min(i + windowSize, data.length);
+        for (let j = i; j < end; j++) sum += data[j] * data[j];
+        const rms = Math.sqrt(sum / (end - i));
+        totalWindows++;
+        if (rms > 0.008) speechWindows++;
+      }
+
+      await ctx.close();
+      return {
+        speechRatio: totalWindows ? speechWindows / totalWindows : fallback.speechRatio,
+        durationSec: buffer.duration || durationSec,
+        estimated: false,
+      };
+    } catch (_) {
+      const bytesPerSec = blob.size / Math.max(durationSec, 1);
+      return {
+        speechRatio: bytesPerSec > 800 ? 0.5 : 0.3,
+        durationSec,
+        estimated: true,
+      };
+    }
+  }
+
+  function getDurationTarget(part) {
+    const targets = {
+      part1: { min: 12, ideal: 25, max: 45 },
+      part2: { min: 50, ideal: 110, max: 150 },
+      part3: { min: 25, ideal: 50, max: 90 },
+    };
+    return targets[part] || targets.part1;
+  }
+
+  function scoreDuration(durationSec, part) {
+    const { min, ideal, max } = getDurationTarget(part);
+    let bonus = 0;
+    if (durationSec >= min) bonus += 0.4;
+    if (durationSec >= ideal * 0.6) bonus += 0.4;
+    if (durationSec >= ideal * 0.85) bonus += 0.5;
+    if (durationSec >= ideal) bonus += 0.3;
+    if (durationSec > max) bonus -= 0.3;
+    return bonus;
   }
 
   function countFillers(text) {
@@ -484,8 +589,20 @@
 
   function analyzeGrammar(text) {
     const issues = [];
-    const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 5);
-    if (sentences.length === 0) return { score: 4.0, issues: ["No complete sentences detected"] };
+    if (!text || !text.trim()) {
+      return { score: 5.0, issues: ["No transcript — estimated from audio"] };
+    }
+
+    let sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter((s) => s.length > 5);
+    if (sentences.length === 0) {
+      sentences = text.split(/\s+(?=(?:and|but|so|because|although|when|if|who|which)\s)/i)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 5);
+    }
+    if (sentences.length === 0 && text.trim().length > 8) {
+      sentences = [text.trim()];
+    }
+    if (sentences.length === 0) return { score: 5.0, issues: ["Response too short for analysis"] };
 
     let score = 6.0;
     const lower = text.toLowerCase();
@@ -517,13 +634,15 @@
     return { score: clampBand(score), issues };
   }
 
-  function analyzeFluency(text, durationSec) {
+  function analyzeFluency(text, durationSec, audioMetrics) {
     const tokens = tokenize(text);
     const wordCount = tokens.length;
     const fillers = countFillers(text);
     let score = 5.5;
 
-    if (wordCount === 0) return { score: 4.0, wpm: 0, fillers, comment: "未检测到有效语音内容" };
+    if (wordCount === 0) {
+      return analyzeFluencyFromAudio(durationSec, audioMetrics);
+    }
 
     const wpm = durationSec > 0 ? (wordCount / durationSec) * 60 : wordCount * 2;
 
@@ -547,13 +666,37 @@
     return { score: clampBand(score), wpm: Math.round(wpm), fillers };
   }
 
-  function analyzeVocabulary(text) {
+  function analyzeFluencyFromAudio(durationSec, audioMetrics) {
+    let score = 5.0;
+    const { speechRatio = 0.3 } = audioMetrics || {};
+
+    score += scoreDuration(durationSec, state.currentPart);
+    if (speechRatio > 0.25) score += 0.5;
+    if (speechRatio > 0.4) score += 0.5;
+    if (speechRatio > 0.55) score += 0.5;
+    if (durationSec >= 8) score += 0.3;
+
+    return {
+      score: clampBand(score),
+      wpm: 0,
+      fillers: 0,
+      fromAudio: true,
+    };
+  }
+
+  function analyzeVocabulary(text, durationSec, audioMetrics) {
     const tokens = tokenize(text);
     const unique = new Set(tokens);
     const wordCount = tokens.length;
     let score = 5.5;
 
-    if (wordCount === 0) return { score: 4.0, uniqueRatio: 0, advanced: 0 };
+    if (wordCount === 0) {
+      let score = 5.0;
+      score += scoreDuration(durationSec, state.currentPart) * 0.6;
+      if (audioMetrics?.speechRatio > 0.35) score += 0.5;
+      if (durationSec >= getDurationTarget(state.currentPart).ideal * 0.7) score += 0.5;
+      return { score: clampBand(score), uniqueRatio: 0, advanced: 0, fromAudio: true };
+    }
 
     const uniqueRatio = unique.size / wordCount;
     const advanced = countAdvancedWords(tokens);
@@ -572,12 +715,20 @@
     return { score: clampBand(score), uniqueRatio, advanced };
   }
 
-  function analyzePronunciation(text, durationSec) {
+  function analyzePronunciation(text, durationSec, audioMetrics) {
     const tokens = tokenize(text);
     const wordCount = tokens.length;
     let score = 5.5;
 
-    if (wordCount === 0) return { score: 4.0, clarity: 0 };
+    if (wordCount === 0) {
+      let score = 5.5;
+      const { speechRatio = 0.3 } = audioMetrics || {};
+      if (speechRatio > 0.3) score += 0.5;
+      if (speechRatio > 0.45) score += 0.5;
+      if (speechRatio > 0.6) score += 0.5;
+      if (durationSec >= 10) score += 0.3;
+      return { score: clampBand(score), clarity: speechRatio, fromAudio: true };
+    }
 
     const clarity = Math.min(1, wordCount / Math.max(durationSec * 1.5, 10));
 
@@ -600,6 +751,17 @@
 
   function generateComments(scores, analysis) {
     const comments = {};
+    const audioOnly = analysis.fluency?.fromAudio || analysis.vocabulary?.fromAudio;
+
+    if (audioOnly) {
+      comments.fluency = `未识别到英文文本，已根据录音时长（${analysis.durationSec || "?"}秒）和语音活跃度估算。建议用 Chrome 浏览器或在设置中配置 OpenAI Key 以获得更精准评分。`;
+      comments.vocabulary = "无法分析词汇（语音识别未返回文本），请尝试在安静环境、清晰发音并用英语回答。";
+      comments.grammar = "无法分析语法结构，建议在回答中使用完整句式和连接词。";
+      comments.pronunciation = analysis.audioMetrics?.speechRatio > 0.4
+        ? "检测到较为连续的语音输出，发音清晰度可能良好。配置 API Key 后可获更精准评估。"
+        : "语音片段较短或不够连续，建议放慢语速、清晰发音。";
+      return comments;
+    }
 
     if (scores.fluency >= 7) {
       comments.fluency = "语速自然，表达连贯，停顿控制良好。";
@@ -636,11 +798,11 @@
     return comments;
   }
 
-  function heuristicScore(text, durationSec) {
-    const fluency = analyzeFluency(text, durationSec);
-    const vocabulary = analyzeVocabulary(text);
+  function heuristicScore(text, durationSec, audioMetrics) {
+    const fluency = analyzeFluency(text, durationSec, audioMetrics);
+    const vocabulary = analyzeVocabulary(text, durationSec, audioMetrics);
     const grammar = analyzeGrammar(text);
-    const pronunciation = analyzePronunciation(text, durationSec);
+    const pronunciation = analyzePronunciation(text, durationSec, audioMetrics);
 
     const scores = {
       fluency: fluency.score,
@@ -653,9 +815,17 @@
       (scores.fluency + scores.vocabulary + scores.grammar + scores.pronunciation) / 4
     );
 
-    const comments = generateComments(scores, { fluency, vocabulary, grammar, pronunciation });
+    const comments = generateComments(scores, {
+      fluency,
+      vocabulary,
+      grammar,
+      pronunciation,
+      durationSec,
+      audioMetrics,
+    });
 
-    return { scores, overall, comments, method: "heuristic" };
+    const fromAudio = fluency.fromAudio || vocabulary.fromAudio;
+    return { scores, overall, comments, method: fromAudio ? "audio" : "heuristic" };
   }
 
   async function openaiScore(text, question) {
@@ -744,21 +914,32 @@ Respond ONLY with valid JSON (no markdown):
       text = await transcribeWithWhisper();
     }
 
+    const audioMetrics = state.audioBlob
+      ? await getAudioSpeechMetrics(state.audioBlob, durationSec)
+      : null;
+
     if (text) {
       els.transcriptBox.hidden = false;
       els.transcriptText.textContent = text;
+    } else {
+      els.transcriptBox.hidden = false;
+      els.transcriptText.textContent = "（未识别到文本，已根据录音音频估算评分）";
     }
 
     const questionText = getQuestionDisplayText();
     let result = null;
 
-    if (state.settings.openaiKey) {
+    if (state.settings.openaiKey && text) {
       result = await openaiScore(text, questionText);
     }
 
     if (!result) {
-      result = heuristicScore(text, durationSec);
-      els.scoringNote.textContent = "基于浏览器语音识别 + 语言分析的智能评分";
+      result = heuristicScore(text || "", durationSec, audioMetrics);
+      if (result.method === "audio") {
+        els.scoringNote.textContent = "基于录音时长与语音分析的估算评分（语音识别未返回文本）";
+      } else {
+        els.scoringNote.textContent = "基于浏览器语音识别 + 语言分析的智能评分";
+      }
     } else {
       els.scoringNote.textContent = "由 OpenAI GPT 提供的 AI 评分";
     }
@@ -780,7 +961,8 @@ Respond ONLY with valid JSON (no markdown):
 
     try {
       const formData = new FormData();
-      formData.append("file", state.audioBlob, "recording.webm");
+      const ext = state.audioBlob.type.includes("mp4") ? "recording.m4a" : "recording.webm";
+      formData.append("file", state.audioBlob, ext);
       formData.append("model", "whisper-1");
       formData.append("language", "en");
 
